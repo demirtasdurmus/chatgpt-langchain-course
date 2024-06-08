@@ -8,33 +8,36 @@ from langchain.callbacks.base import BaseCallbackHandler
 from queue import Queue
 from threading import Thread
 
-queue = Queue()
-
 class StreamingHandler(BaseCallbackHandler):
+  def __init__(self, queue):
+    self.queue = queue
+
   def on_llm_new_token(self, token, **kwargs):
-    queue.put(token)
+    self.queue.put(token)
 
   # to break the while loop when content is finished, see while loop in StreamingChain
   def on_llm_end(self, response, **kwargs):
-    queue.put(None)
+    self.queue.put(None)
 
   # to break the while loop if an error occurs
   def on_llm_error(self, error, **kwargs):
-    queue.put(None)
+    self.queue.put(None)
 
 chat = ChatOpenAI(
-  streaming=True,
-  callbacks=[StreamingHandler()]
+  streaming=True
   )
 
 prompt = ChatPromptTemplate.from_messages([
   ('human', '{content}')
 ])
 
-class StreamingChain(LLMChain):
+class StreamableChain:
   def stream(self, input): 
+    queue = Queue()
+    handler = StreamingHandler(queue)
+
     def task():
-      self(input)
+      self(input, callbacks=[handler])
 
     # offloading this 'task' to a separate thread
     Thread(target=task).start()
@@ -44,6 +47,9 @@ class StreamingChain(LLMChain):
       if token is None:
         break
       yield token
+
+class StreamingChain(StreamableChain, LLMChain):
+  pass
 
 chain = StreamingChain(llm=chat, prompt=prompt)
 
