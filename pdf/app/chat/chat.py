@@ -63,5 +63,7 @@ def build_chat(chat_args: ChatArgs):
         llm=llm,
         memory=memory,
         retriever=retriever,
-        condense_question_llm=condense_question_llm
+        condense_question_llm=condense_question_llm,
+        metadata=chat_args.metadata
     )
+
